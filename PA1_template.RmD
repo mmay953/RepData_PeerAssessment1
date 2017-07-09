@@ -1,0 +1,114 @@
+---
+title: "PA1_tepmlate.Rmd"
+author: "Michaela May"
+date: "9 juillet 2017"
+output: html_document
+---
+
+
+Assignment 
+==============================================
+## Load the data
+
+```{r}
+activity<- read.csv("activity.csv")
+
+activity$date <- as.Date(activity$date, "%Y-%m-%d")
+
+library(dplyr)
+
+dailysteps <- activity%>%group_by(date)%>%summarize(steps=sum(steps, na.rm=TRUE))
+
+```
+
+## What is the mean total number of steps taken per day?
+```{r}
+hist(dailysteps$steps, breaks = 50)
+```
+
+## What are the mean and the median number of steps taken per day?
+```{r}
+mymean <- mean(dailysteps$steps)
+mymedian <- median(dailysteps$steps)
+```
+The mean is `r mymean` and the median is `r mymedian`.
+
+
+## what is the average daily activity pattern?
+
+```{r plot, fig.height=4}
+minutesteps <- activity%>%group_by(interval)%>%summarize(steps=sum(steps, na.rm=TRUE))
+
+library(ggplot2)
+qplot(interval,steps, data = minutesteps, geom="line")
+```
+
+Which 5 Minute interval contains the maximum number of steps?
+
+```{r}
+moststeps<- minutesteps$interval[which(minutesteps$steps==max(minutesteps$steps))]
+```
+
+The interval containing the most steps is `moststeps`.
+
+## Imputing missing values
+
+```{r}
+myna <- sum(is.na(activity))
+```
+There are `myna` missing values in this data set.
+
+In order to treat missing values, we will assume that they have the same value as the average in the same interval.
+
+```{r}
+library(dplyr)
+
+avgsteps <- activity%>%group_by(interval)%>%summarize(steps=mean(steps, na.rm=TRUE))
+
+activity2 <- inner_join(activity,avgsteps, by=c("interval"="interval"))
+
+imputedsteps <- replace(activity2$steps.x,is.na(activity2$steps.x),activity2$steps.y[is.na(activity2$steps.x)])
+
+activity3 <- mutate(activity2, steps = imputedsteps)
+ 
+newactivity <- activity3[,c(5,2,3)]
+```
+
+Above, we have created a new data set, where missing values have been replaced by the average values on other days in the same time interval.
+How does the histogram for steps per day change?
+
+```{r}
+dailysteps2 <- newactivity%>%group_by(date)%>%summarize(steps=sum(steps, na.rm=TRUE))
+
+par(mfrow=c(1,2))
+hist(dailysteps$steps, breaks = 20, main = "Original Data")
+hist(dailysteps2$steps, breaks = 20, main = "Cleaned Data")
+```
+
+The imputing of missing values has increased the number of daily steps
+
+```{r}
+### imputed mean & median
+mymean2 <- mean(dailysteps2$steps)
+mymedian2 <- median(dailysteps2$steps)
+```
+The new mean is `r mymean2`, compared to `r mymean` before.
+And the new median is `r mymedian2`, compared to `r mymedian` before.
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+Let's have a look if there is a difference between weekend and weekdays in the step pattern?
+
+```{r}
+weekfac <- as.factor(ifelse(weekdays(newactivity$date) %in% c("samedi","dimanche"),"weekend","weekday"))
+newactivity2 <- mutate(newactivity, wday = weekfac)
+intervalnew <- newactivity2%>%group_by(interval,wday)%>%summarize(steps=sum(steps, na.rm=TRUE))
+
+par(mfrow = c(2,1)) 
+qplot(interval,steps, data = intervalnew, geom="line", main="Activity per 5-minute interval", facets = wday~.)
+```
+
+Seem's like the subject(s) in our data set likes their lazy weekend!
+
+
